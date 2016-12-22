@@ -50,7 +50,7 @@ func main(){
 Error Handling
 ---------------------------------
 
-USPS API errors are returned as the Error Description from the response
+Errors are returned as the Error Description from the USPS API response
 
 
 Google App Engine settings

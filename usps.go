@@ -16,10 +16,24 @@ const (
 	Type   = "CityStateLookup"
 )
 
+// New returns a USPS API client.
+func New(userID string) *Client {
+	c := &Client{
+		userID: userID,
+		cl:     http.DefaultClient,
+	}
+	return c
+}
+
+// Client is a USPS API client.
+type Client struct {
+	userID string
+	cl     *http.Client
+}
+
 //ValidateZip returns non empty Response if successful
-func (a API) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
-	client := a.HTTPClient
-	xmlVals := "<CityStateLookupRequest USERID='" + a.Credentials + "'><ZipCode ID='0'> <Zip5>" + zipCode + "</Zip5></ZipCode></CityStateLookupRequest>"
+func (c *Client) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
+	xmlVals := "<CityStateLookupRequest USERID='" + c.userID + "'><ZipCode ID='0'> <Zip5>" + zipCode + "</Zip5></ZipCode></CityStateLookupRequest>"
 
 	//Build out URL
 	u, err := url.Parse(Scheme + Host)
@@ -34,7 +48,7 @@ func (a API) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
 	u.RawQuery = q.Encode()
 
 	//Get Request
-	resp, err := client.Get(u.String())
+	resp, err := c.cl.Get(u.String())
 	if err != nil {
 		return nil, err
 	}
@@ -76,25 +90,6 @@ func (a API) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
 	}
 
 	return zipResp, nil
-}
-
-// New returns an API struct
-func New(username string) *API {
-	c := &API{
-		Credentials: username,
-		HTTPClient:  http.DefaultClient,
-	}
-	return c
-}
-
-// *****************************************************************************
-// Structs for the USPS API
-// *****************************************************************************
-
-//API struct for USPS API settings
-type API struct {
-	Credentials string
-	HTTPClient  *http.Client
 }
 
 // CityStateLookupResponse is the XML response for the CityStateLookupRequest

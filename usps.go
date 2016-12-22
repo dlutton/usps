@@ -58,13 +58,13 @@ func (a API) ValidateZip(zipCode string) (*Response, error) {
 		xml.Unmarshal(body, &e)
 		err := errors.New(e.Description.Text)
 		return r, err
-	} else if r.CityStateLookupResponse.ZipCode.Error != nil {
+	}
+	if r.CityStateLookupResponse.ZipCode.Error != nil {
 		err := errors.New(r.CityStateLookupResponse.ZipCode.Error.Description.Text)
 		return r, err
 	}
 
 	return r, nil
-
 }
 
 //NewUSPSApi returns an API struct

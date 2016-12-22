@@ -78,8 +78,8 @@ func (a API) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
 	return zipResp, nil
 }
 
-//NewUSPSApi returns an API struct
-func NewUSPSApi(username string) *API {
+// New returns an API struct
+func New(username string) *API {
 	c := &API{
 		Credentials: username,
 		HTTPClient:  http.DefaultClient,

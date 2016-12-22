@@ -3,7 +3,7 @@ package usps
 import (
 	"encoding/xml"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 )
@@ -19,15 +19,12 @@ const (
 //ValidateZip returns non empty Response if successful
 func (a API) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
 	client := a.HTTPClient
-	r := &CityStateLookupResponse{}
-	e := &apiError{}
-
 	xmlVals := "<CityStateLookupRequest USERID='" + a.Credentials + "'><ZipCode ID='0'> <Zip5>" + zipCode + "</Zip5></ZipCode></CityStateLookupRequest>"
 
 	//Build out URL
 	u, err := url.Parse(Scheme + Host)
 	if err != nil {
-		return r, err
+		return nil, err
 	}
 
 	u.Path = Path
@@ -39,29 +36,46 @@ func (a API) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
 	//Get Request
 	resp, err := client.Get(u.String())
 	if err != nil {
-		return r, err
+		return nil, err
 	}
 
-	//Parse XML
-	body, readerr := ioutil.ReadAll(resp.Body)
-	if readerr == nil {
-		//load xml object
-		if xmlerr := xml.Unmarshal(body, &r); xmlerr != nil {
-			return r, xmlerr
+	var (
+		decoder = xml.NewDecoder(resp.Body)
+		zipResp *CityStateLookupResponse
+		apiErr  *apiError
+	)
+
+	for {
+		// Read tokens in the XML document from the stream (resp.Body)
+		t, err := decoder.Token()
+		if err == io.EOF || t == nil {
+			break // end of stream
 		}
-	} else {
-		return r, readerr
-	}
-
-	//Handle USPS error messages
-	if r.ZipCode.ID == "" {
-		if err := xml.Unmarshal(body, &e); err != nil {
-			return r, nil
+		if err != nil {
+			return nil, err
 		}
-		return r, e
+		switch se := t.(type) {
+		case xml.StartElement:
+			switch se.Name.Local {
+			case "CityStateLookupResponse":
+				if err = decoder.DecodeElement(&zipResp, &se); err != nil {
+					return nil, err
+				}
+			case "Error":
+				if err = decoder.DecodeElement(&apiErr, &se); err != nil {
+					return nil, err
+				}
+			default:
+				return nil, fmt.Errorf("unknown element: %q", se.Name.Local)
+			}
+		}
 	}
 
-	return r, nil
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	return zipResp, nil
 }
 
 //NewUSPSApi returns an API struct

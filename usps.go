@@ -8,32 +8,59 @@ import (
 	"net/url"
 )
 
-//USPS API Signature
-const (
-	Scheme = "http://"
-	Host   = "production.shippingapis.com"
-	Path   = "/ShippingAPI.dll"
-	Type   = "CityStateLookup"
-)
-
 // New returns a USPS API client.
-func New(userID string) *Client {
+func New(userID string, options ...Option) *Client {
 	c := &Client{
-		userID: userID,
-		cl:     http.DefaultClient,
+		userID:   userID,
+		endpoint: "http://production.shippingapis.com/ShippingAPI.dll",
+		client:   http.DefaultClient,
 	}
+	c.setOption(options...)
 	return c
 }
 
 // Client is a USPS API client.
 type Client struct {
-	userID string
-	cl     *http.Client
+	userID   string
+	endpoint string
+	client   *http.Client
+}
+
+// An Option sets an option on a Client. It has private methods to prevent its
+// use outside of this package.
+type Option interface {
+	set(*Client)
+}
+
+// A function adapter that implements the Option interface.
+type optionFunc func(*Client)
+
+func (fn optionFunc) set(r *Client) { fn(r) }
+
+// Configure a Client.
+func (c *Client) setOption(options ...Option) {
+	for _, opt := range options {
+		opt.set(c)
+	}
+}
+
+// Endpoint sets the endpoint of the USPS API.
+func Endpoint(endpoint string) Option {
+	return optionFunc(func(c *Client) {
+		c.endpoint = endpoint
+	})
+}
+
+// HTTPClient sets the http.Client used to communicate with the USPS API.
+func HTTPClient(client *http.Client) Option {
+	return optionFunc(func(c *Client) {
+		c.client = client
+	})
 }
 
 //ValidateZip returns non empty Response if successful
 func (c *Client) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
-	req, err := http.NewRequest("GET", Scheme+Host+Path, nil)
+	req, err := http.NewRequest("GET", c.endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +70,7 @@ func (c *Client) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
 	req.URL.RawQuery = fmt.Sprintf("API=CityStateLookup&XML=%s", url.QueryEscape(fmt.Sprintf(query, c.userID, zipCode)))
 
 	// Get the request
-	resp, err := c.cl.Do(req)
+	resp, err := c.client.Do(req)
 	if err != nil {
 		return nil, err
 	}

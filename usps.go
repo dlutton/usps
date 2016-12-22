@@ -33,22 +33,17 @@ type Client struct {
 
 //ValidateZip returns non empty Response if successful
 func (c *Client) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
-	xmlVals := "<CityStateLookupRequest USERID='" + c.userID + "'><ZipCode ID='0'> <Zip5>" + zipCode + "</Zip5></ZipCode></CityStateLookupRequest>"
-
-	//Build out URL
-	u, err := url.Parse(Scheme + Host)
+	req, err := http.NewRequest("GET", Scheme+Host+Path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	u.Path = Path
-	q := u.Query()
-	q.Set("API", Type)
-	q.Set("XML", xmlVals)
-	u.RawQuery = q.Encode()
+	// Construct the URL encoded query
+	query := `<CityStateLookupRequest USERID=%q><ZipCode ID="0"><Zip5>%s</Zip5></ZipCode></CityStateLookupRequest>`
+	req.URL.RawQuery = fmt.Sprintf("API=CityStateLookup&XML=%s", url.QueryEscape(fmt.Sprintf(query, c.userID, zipCode)))
 
-	//Get Request
-	resp, err := c.cl.Get(u.String())
+	// Get the request
+	resp, err := c.cl.Do(req)
 	if err != nil {
 		return nil, err
 	}

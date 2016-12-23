@@ -78,7 +78,7 @@ func (c *Client) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
 	var (
 		decoder = xml.NewDecoder(resp.Body)
 		zipResp *CityStateLookupResponse
-		apiErr  *apiError
+		apiErr  *APIError
 	)
 
 	for {
@@ -126,8 +126,8 @@ type CityStateLookupResponse struct {
 	} `xml:"ZipCode,omitempty" json:"zipcode,omitempty"`
 }
 
-// apiError is the XML structure for errors returned by the API.
-type apiError struct {
+// APIError is the XML structure for errors returned by the API.
+type APIError struct {
 	XMLName     xml.Name `xml:"Error" json:"-"`
 	Number      string   `xml:"Number,omitempty" json:"number"`
 	Description string   `xml:"Description,omitempty" json:"description"`
@@ -135,6 +135,6 @@ type apiError struct {
 }
 
 // Implement the error interface.
-func (e *apiError) Error() string {
-	return fmt.Sprintf("number: %s, source: %s; %s", e.Number, e.Source, e.Description)
+func (e *APIError) Error() string {
+	return e.Description
 }

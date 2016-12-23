@@ -8,17 +8,6 @@ import (
 	"net/url"
 )
 
-// New returns a USPS API client.
-func New(userID string, options ...Option) *Client {
-	c := &Client{
-		userID:   userID,
-		endpoint: "http://production.shippingapis.com/ShippingAPI.dll",
-		client:   http.DefaultClient,
-	}
-	c.setOption(options...)
-	return c
-}
-
 // Client is a USPS API client.
 type Client struct {
 	userID   string
@@ -44,18 +33,29 @@ func (c *Client) setOption(options ...Option) {
 	}
 }
 
-// Endpoint sets the endpoint of the USPS API.
-func Endpoint(endpoint string) Option {
+// WithEndpoint sets the endpoint of the USPS API.
+func WithEndpoint(endpoint string) Option {
 	return optionFunc(func(c *Client) {
 		c.endpoint = endpoint
 	})
 }
 
-// HTTPClient sets the http.Client used to communicate with the USPS API.
-func HTTPClient(client *http.Client) Option {
+// WithHTTPClient sets the http.Client used to communicate with the USPS API.
+func WithHTTPClient(client *http.Client) Option {
 	return optionFunc(func(c *Client) {
 		c.client = client
 	})
+}
+
+// NewClient returns a USPS API client.
+func NewClient(userID string, options ...Option) *Client {
+	c := &Client{
+		userID:   userID,
+		endpoint: "http://production.shippingapis.com/ShippingAPI.dll",
+		client:   http.DefaultClient,
+	}
+	c.setOption(options...)
+	return c
 }
 
 //ValidateZip returns non empty Response if successful

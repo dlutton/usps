@@ -15,7 +15,7 @@ client := usps.New("USERID")
 ### Google App Engine settings
 
 ````go
-client := usps.New("USERID", usps.HTTPClient(&http.Client{
+client := usps.NewClient("USERID", usps.WithHTTPClient(&http.Client{
 	Transport: &urlfetch.Transport{Context: appengine.NewContext(r)},
 }))
 ````
@@ -32,11 +32,14 @@ import (
 	"github.com/dlutton/usps"
 )
 
-func main(){
-	client := usps.New("USERID")
+func main() {
+	client := usps.NewClient("USERID")
 
 	results, err := client.ValidateZip("91362")
 	if err != nil {
+		if apiErr, ok := err.(*usps.APIError); ok {
+			log.Fatalf("number: %s, source: %s; %s", apiErr.Number, apiErr.Source, apiErr.Description)
+		}
 		log.Fatal(err)
 	}
 
@@ -48,4 +51,3 @@ func main(){
 	log.Print(string(output))
 }
 ```
-

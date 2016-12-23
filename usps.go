@@ -111,6 +111,10 @@ func (c *Client) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
 		return nil, apiErr
 	}
 
+	if zipResp.ZipCode.Error != nil {
+		return nil, zipResp.ZipCode.Error
+	}
+
 	return zipResp, nil
 }
 
@@ -119,10 +123,11 @@ func (c *Client) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
 type CityStateLookupResponse struct {
 	XMLName xml.Name `xml:"CityStateLookupResponse" json:"-"`
 	ZipCode struct {
-		ID    string `xml:"ID,attr,omitempty" json:"id,omitempty"`
-		Zip5  string `xml:"Zip5,omitempty" json:"zip5,omitempty"`
-		City  string `xml:"City,omitempty" json:"city,omitempty"`
-		State string `xml:"State,omitempty" json:"state,omitempty"`
+		ID    string    `xml:"ID,attr,omitempty" json:"id,omitempty"`
+		Zip5  string    `xml:"Zip5,omitempty" json:"zip5,omitempty"`
+		City  string    `xml:"City,omitempty" json:"city,omitempty"`
+		State string    `xml:"State,omitempty" json:"state,omitempty"`
+		Error *APIError `xml:"Error,omitempty" json:"error,omitempty"`
 	} `xml:"ZipCode,omitempty" json:"zipcode,omitempty"`
 }
 

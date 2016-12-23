@@ -2,152 +2,139 @@ package usps
 
 import (
 	"encoding/xml"
-	"errors"
-	"io/ioutil"
+	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 )
 
-//USPS API Signature
-const (
-	Scheme = "http://"
-	Host   = "production.shippingapis.com"
-	Path   = "/ShippingAPI.dll"
-	Type   = "CityStateLookup"
-)
-
-//ValidateZip returns non empty Response if successful
-func (a API) ValidateZip(zipCode string) (*Response, error) {
-	client := a.HTTPClient
-	r := &Response{}
-	e := &Error{}
-
-	xmlVals := "<CityStateLookupRequest USERID='" + a.Credentials + "'><ZipCode ID='0'> <Zip5>" + zipCode + "</Zip5></ZipCode></CityStateLookupRequest>"
-
-	//Build out URL
-	u, err := url.Parse(Scheme + Host)
-	if err != nil {
-		return r, err
+// New returns a USPS API client.
+func New(userID string, options ...Option) *Client {
+	c := &Client{
+		userID:   userID,
+		endpoint: "http://production.shippingapis.com/ShippingAPI.dll",
+		client:   http.DefaultClient,
 	}
-
-	u.Path = Path
-	q := u.Query()
-	q.Set("API", Type)
-	q.Set("XML", xmlVals)
-	u.RawQuery = q.Encode()
-
-	//Get Request
-	resp, err := client.Get(u.String())
-	if err != nil {
-		return r, err
-	}
-
-	//Parse XML
-	body, readerr := ioutil.ReadAll(resp.Body)
-	if readerr == nil {
-		//load xml object
-		if xmlerr := xml.Unmarshal(body, &r.CityStateLookupResponse); xmlerr != nil {
-			return r, xmlerr
-		}
-	} else {
-		return r, readerr
-	}
-
-	//Handle USPS error messages
-	if r.CityStateLookupResponse.ZipCode == nil {
-		xml.Unmarshal(body, &e)
-		err := errors.New(e.Description.Text)
-		return r, err
-	}
-	if r.CityStateLookupResponse.ZipCode.Error != nil {
-		err := errors.New(r.CityStateLookupResponse.ZipCode.Error.Description.Text)
-		return r, err
-	}
-
-	return r, nil
-}
-
-//NewUSPSApi returns an API struct
-func NewUSPSApi(username string) *API {
-	c := &API{
-		Credentials: username,
-		HTTPClient:  http.DefaultClient,
-	}
+	c.setOption(options...)
 	return c
 }
 
-// *****************************************************************************
-// Structs for the USPS API
-// *****************************************************************************
-
-//API struct for USPS API settings
-type API struct {
-	Credentials string
-	HTTPClient  *http.Client
+// Client is a USPS API client.
+type Client struct {
+	userID   string
+	endpoint string
+	client   *http.Client
 }
 
-//Response for full response
-type Response struct {
-	CityStateLookupResponse *CityStateLookupResponse `xml:"CityStateLookupResponse,omitempty" json:"response,omitempty"`
+// An Option sets an option on a Client. It has private methods to prevent its
+// use outside of this package.
+type Option interface {
+	set(*Client)
 }
 
-//CityStateLookupResponse for success/error response
+// A function adapter that implements the Option interface.
+type optionFunc func(*Client)
+
+func (fn optionFunc) set(r *Client) { fn(r) }
+
+// Configure a Client.
+func (c *Client) setOption(options ...Option) {
+	for _, opt := range options {
+		opt.set(c)
+	}
+}
+
+// Endpoint sets the endpoint of the USPS API.
+func Endpoint(endpoint string) Option {
+	return optionFunc(func(c *Client) {
+		c.endpoint = endpoint
+	})
+}
+
+// HTTPClient sets the http.Client used to communicate with the USPS API.
+func HTTPClient(client *http.Client) Option {
+	return optionFunc(func(c *Client) {
+		c.client = client
+	})
+}
+
+//ValidateZip returns non empty Response if successful
+func (c *Client) ValidateZip(zipCode string) (*CityStateLookupResponse, error) {
+	req, err := http.NewRequest("GET", c.endpoint, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	// Construct the URL encoded query
+	query := `<CityStateLookupRequest USERID=%q><ZipCode ID="0"><Zip5>%s</Zip5></ZipCode></CityStateLookupRequest>`
+	req.URL.RawQuery = fmt.Sprintf("API=CityStateLookup&XML=%s", url.QueryEscape(fmt.Sprintf(query, c.userID, zipCode)))
+
+	// Get the request
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		decoder = xml.NewDecoder(resp.Body)
+		zipResp *CityStateLookupResponse
+		apiErr  *apiError
+	)
+
+	for {
+		// Read tokens in the XML document from the stream (resp.Body)
+		t, err := decoder.Token()
+		if err == io.EOF || t == nil {
+			break // end of stream
+		}
+		if err != nil {
+			return nil, err
+		}
+		switch se := t.(type) {
+		case xml.StartElement:
+			switch se.Name.Local {
+			case "CityStateLookupResponse":
+				if err = decoder.DecodeElement(&zipResp, &se); err != nil {
+					return nil, err
+				}
+			case "Error":
+				if err = decoder.DecodeElement(&apiErr, &se); err != nil {
+					return nil, err
+				}
+			default:
+				return nil, fmt.Errorf("unknown element: %q", se.Name.Local)
+			}
+		}
+	}
+
+	if apiErr != nil {
+		return nil, apiErr
+	}
+
+	return zipResp, nil
+}
+
+// CityStateLookupResponse is the XML response for the CityStateLookupRequest
+// type.
 type CityStateLookupResponse struct {
-	ZipCode *ZipCode `xml:"ZipCode,omitempty" json:"zip_code,omitempty"`
+	XMLName xml.Name `xml:"CityStateLookupResponse" json:"-"`
+	ZipCode struct {
+		ID    string `xml:"ID,attr,omitempty" json:"id,omitempty"`
+		Zip5  string `xml:"Zip5,omitempty" json:"zip5,omitempty"`
+		City  string `xml:"City,omitempty" json:"city,omitempty"`
+		State string `xml:"State,omitempty" json:"state,omitempty"`
+	} `xml:"ZipCode,omitempty" json:"zipcode,omitempty"`
 }
 
-//ZipCode for success/error response
-type ZipCode struct {
-	ID    string `xml:"ID,attr"  json:"id,"`
-	City  *City  `xml:"City,omitempty" json:"city,omitempty"`
-	State *State `xml:"State,omitempty" json:"state,omitempty"`
-	Zip5  *Zip5  `xml:"Zip5,omitempty" json:"zip5,omitempty"`
-	Error *Error `xml:"Error,omitempty" json:"error,omitempty"`
+// apiError is the XML structure for errors returned by the API.
+type apiError struct {
+	XMLName     xml.Name `xml:"Error" json:"-"`
+	Number      string   `xml:"Number,omitempty" json:"number"`
+	Description string   `xml:"Description,omitempty" json:"description"`
+	Source      string   `xml:"Source,omitempty" json:"source"`
 }
 
-//Zip5 for successful response
-type Zip5 struct {
-	Text string `xml:",chardata" json:",omitempty"`
-}
-
-//City for successful response
-type City struct {
-	Text string `xml:",chardata" json:",omitempty"`
-}
-
-//State for successful response
-type State struct {
-	Text string `xml:",chardata" json:",omitempty"`
-}
-
-//Error for error response
-type Error struct {
-	Description *Description `xml:" Description,omitempty" json:"description,omitempty"`
-	HelpContext *HelpContext `xml:" HelpContext,omitempty" json:"help_context,omitempty"`
-	HelpFile    *HelpFile    `xml:" HelpFile,omitempty" json:"help_file,omitempty"`
-	Number      *Number      `xml:" Number,omitempty" json:"number,omitempty"`
-	Source      *Source      `xml:" Source,omitempty" json:"source,omitempty"`
-}
-
-//Description for for error response
-type Description struct {
-	Text string `xml:",chardata" json:",omitempty"`
-}
-
-//HelpContext for error response
-type HelpContext struct {
-}
-
-//HelpFile for error response
-type HelpFile struct {
-}
-
-//Number for error response
-type Number struct {
-	Text string `xml:",chardata" json:",omitempty"`
-}
-
-//Source for error response
-type Source struct {
-	Text string `xml:",chardata" json:",omitempty"`
+// Implement the error interface.
+func (e *apiError) Error() string {
+	return fmt.Sprintf("number: %s, source: %s; %s", e.Number, e.Source, e.Description)
 }

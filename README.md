@@ -1,63 +1,51 @@
-usps
--------------
-Zip Code validation using the USPS API in GO
+# usps
 
+Zip Code validation using the USPS API in Go.
 
-
-Examples
--------------
+## Examples
 
 ### Authentication
 
 If you already have the USERID, creating the client is simple:
 
+```go
+client := usps.New("USERID")
+```
+
+### Google App Engine settings
+
 ````go
-api := usps.NewUSPSApi("USERID")
+client := usps.New("USERID", usps.HTTPClient(&http.Client{
+	Transport: &urlfetch.Transport{Context: appengine.NewContext(r)},
+}))
 ````
 
 ### Full Example
 
-````go
+```go
 package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"usps"
+	"log"
+
+	"github.com/dlutton/usps"
 )
 
 func main(){
-	api := usps.NewUSPSApi("USERID")
+	client := usps.New("USERID")
 
-	results, err := api.ValidateZip("91362")
+	results, err := client.ValidateZip("91362")
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		log.Fatal(err)
 	}
 
-	outgoingJSON, err := json.Marshal(results)
+	output, err := json.Marshal(results)
 	if err != nil {
-		fmt.Println(err.Error())
-		return
+		log.Fatal(err)
 	}
 
-	fmt.Println(string(outgoingJSON))
+	log.Print(string(output))
 }
-````
+```
 
-
-
-Error Handling
----------------------------------
-
-Errors are returned as the Error Description from the USPS API response
-
-
-Google App Engine settings
----------------------------------
-
-````go
-	api := usps.NewUSPSApi("USERID")
-	c := appengine.NewContext(r)
-	api.HTTPClient.Transport = &urlfetch.Transport{Context: c}
-````

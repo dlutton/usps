@@ -1,4 +1,5 @@
 # usps
+[![CircleCI](https://circleci.com/gh/dlutton/usps.svg?style=svg)](https://circleci.com/gh/dlutton/usps)
 
 Zip Code validation using the USPS API in Go.
 

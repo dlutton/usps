@@ -17,11 +17,11 @@ client := usps.New("USERID")
 
 ### Google App Engine settings
 
-````go
+```go
 client := usps.NewClient("USERID", usps.WithHTTPClient(&http.Client{
 	Transport: &urlfetch.Transport{Context: appengine.NewContext(r)},
 }))
-````
+```
 
 ### Full Example
 
@@ -54,3 +54,13 @@ func main() {
 	log.Print(string(output))
 }
 ```
+
+### Development
+
+```
+go get -v -u github.com/dlutton/usps
+```
+
+### License
+
+This software is created under Apache v2 License. For the full license text, please see License.md

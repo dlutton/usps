@@ -1,7 +1,7 @@
 # usps
 [![CircleCI](https://circleci.com/gh/dlutton/usps.svg?style=svg)](https://circleci.com/gh/dlutton/usps)
 [![GoDoc](https://godoc.org/github.com/gopher/gopher?status.svg)](https://godoc.org/github.com/dlutton/usps)
-[![Go Report Card](https://goreportcard.com/badge/github.com/gopheracademy/gopher)](https://goreportcard.com/report/github.com/dlutton/usps)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dlutton/usps)](https://goreportcard.com/report/github.com/dlutton/usps)
 
 Zip Code validation using the USPS API in Go.
 
